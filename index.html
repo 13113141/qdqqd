@@ -1,0 +1,1393 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>巧慧快跑</title>
+  <!-- PWA：可添加到主屏幕，像真 App -->
+  <meta name="theme-color" content="#2e3f66">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="巧慧快跑">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon-192.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #2e3f66; }
+    body { touch-action: none; -webkit-tap-highlight-color: transparent; font-family: "PingFang SC", "Microsoft YaHei", sans-serif; }
+
+    canvas { display: block; }
+
+    #score {
+      position: fixed; top: calc(12px + env(safe-area-inset-top)); left: 50%;
+      transform: translateX(-50%);
+      color: #fff; font-size: 26px; font-weight: bold;
+      text-shadow: 0 2px 4px rgba(0,0,0,.4);
+      z-index: 10; pointer-events: none;
+    }
+    #difficulty {
+      position: fixed; top: calc(14px + env(safe-area-inset-top)); left: 14px;
+      color: #fff; font-size: 15px; font-weight: bold;
+      text-shadow: 0 2px 4px rgba(0,0,0,.4); z-index: 10; pointer-events: none;
+    }
+    #combo {
+      position: fixed; top: calc(52px + env(safe-area-inset-top)); left: 50%;
+      transform: translateX(-50%);
+      color: #ffd23e; font-size: 22px; font-weight: bold;
+      text-shadow: 0 2px 4px rgba(0,0,0,.4);
+      opacity: 0; transition: opacity .2s; z-index: 10; pointer-events: none;
+    }
+    #storyWrap {
+      position: fixed; top: calc(46px + env(safe-area-inset-top)); left: 50%;
+      transform: translateX(-50%); width: 58vw; max-width: 260px;
+      display: none; z-index: 10; pointer-events: none;
+    }
+    #storyLabel { color: #fff; font-size: 12px; text-align: center; text-shadow: 0 1px 3px rgba(0,0,0,.4); margin-bottom: 3px; }
+    #storyBar { width: 100%; height: 8px; background: rgba(0,0,0,.25); border-radius: 6px; overflow: hidden; }
+    #storyFill { height: 100%; width: 0%; background: #ff9d2e; }
+
+    #coinUI {
+      position: fixed; top: calc(12px + env(safe-area-inset-top)); right: 14px;
+      color: #fff; font-size: 20px; font-weight: bold;
+      text-shadow: 0 2px 4px rgba(0,0,0,.4);
+      display: flex; align-items: center; gap: 4px;
+      z-index: 10; pointer-events: none;
+    }
+    #mute {
+      position: fixed; top: calc(50px + env(safe-area-inset-top)); right: 14px;
+      width: 40px; height: 40px; border-radius: 50%; border: 2px solid #fff;
+      background: rgba(0,0,0,.25); color: #fff; font-size: 20px;
+      cursor: pointer; z-index: 10; display: flex; align-items: center; justify-content: center;
+    }
+
+    #chaseUI {
+      position: fixed; top: 50%; left: 14px; transform: translateY(-50%);
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      z-index: 10; pointer-events: none;
+    }
+    #chaseFace {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: #3a6ea5; color: #fff; font-size: 22px;
+      display: flex; align-items: center; justify-content: center;
+      border: 2px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,.3);
+    }
+    #chaseBar {
+      width: 14px; height: 40vh; min-height: 120px;
+      background: rgba(0,0,0,.35); border-radius: 8px; overflow: hidden;
+      border: 1px solid rgba(255,255,255,.6);
+      display: flex; align-items: flex-end;
+    }
+    #chaseFill { width: 100%; height: 100%; background: #5bd15b; transition: height .15s; }
+
+    #skillWrap {
+      position: fixed; right: 16px; bottom: calc(24px + env(safe-area-inset-bottom));
+      display: flex; flex-direction: column; align-items: center; gap: 6px; z-index: 10;
+    }
+    #skillMeterWrap {
+      width: 10px; height: 90px; background: rgba(0,0,0,.3);
+      border-radius: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,.5);
+    }
+    #skillMeter { width: 100%; height: 0%; background: #ffe066; transition: height .15s; }
+    #skillBtn {
+      width: 66px; height: 66px; border-radius: 50%; border: 3px solid #fff;
+      font-size: 15px; font-weight: bold; color: #fff; background: #9aa0a8;
+      cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.3); transition: background .2s;
+    }
+    #skillBtn.ready { background: #ff9d2e; animation: pulse .8s infinite; }
+    @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+
+    #dialogue {
+      position: fixed; bottom: calc(112px + env(safe-area-inset-bottom)); left: 50%;
+      transform: translateX(-50%) scale(0);
+      background: #fff; color: #333; padding: 9px 16px; border-radius: 14px;
+      font-size: 16px; max-width: 72vw; text-align: center;
+      box-shadow: 0 3px 10px rgba(0,0,0,.25);
+      transition: transform .18s; z-index: 15; pointer-events: none;
+    }
+    #dialogue.show { transform: translateX(-50%) scale(1); }
+    #dialogue::after {
+      content: ''; position: absolute; left: 50%; bottom: -8px; transform: translateX(-50%);
+      border: 8px solid transparent; border-top-color: #fff;
+    }
+
+    #toast {
+      position: fixed; top: 30%; left: 50%; transform: translateX(-50%);
+      color: #fff; font-size: 24px; font-weight: bold;
+      text-shadow: 0 2px 6px rgba(0,0,0,.5);
+      opacity: 0; transition: opacity .3s; z-index: 20; pointer-events: none; white-space: nowrap;
+    }
+    #flash { position: fixed; inset: 0; background: #fff; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 8; }
+
+    #menu {
+      position: fixed; inset: 0; z-index: 40;
+      background: linear-gradient(180deg, #2e3f66 0%, #48587e 100%);
+      display: flex; align-items: center; justify-content: center;
+    }
+    #menuInner { text-align: center; padding: 20px; max-height: 92vh; overflow-y: auto; }
+    #menu h1 { font-size: 44px; color: #ff8f9a; margin-bottom: 4px; text-shadow: 0 2px 4px rgba(0,0,0,.3); }
+    #menu .sub { color: #bcc6e0; margin-bottom: 10px; font-size: 16px; }
+    #bestLabel { color: #ffd23e; font-size: 15px; font-weight: bold; margin-bottom: 14px; }
+    #menu .btn { display: block; width: 250px; margin: 8px auto; padding: 12px; font-size: 16px; border-radius: 30px; border: none; cursor: pointer; color: #fff; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,.25); }
+    #menu .btn:active { transform: scale(.97); }
+    #btnEndless { background: #3a6ea5; }
+    #menu .hint { margin-top: 20px; color: #96a2c0; font-size: 12px; line-height: 1.7; }
+    #settingsBtn {
+      position: absolute; top: 14px; right: 14px; width: 46px; height: 46px;
+      border-radius: 50%; border: 2px solid #fff; background: rgba(0,0,0,.25);
+      color: #fff; font-size: 22px; cursor: pointer; z-index: 41;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.55);
+      display: none; align-items: center; justify-content: center; z-index: 30;
+    }
+    #settingsOverlay { z-index: 50; } /* 设置弹窗要在主菜单之上 */
+    .panel {
+      background: #fff; border-radius: 18px; padding: 28px 34px; max-width: 86vw;
+      text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,.4);
+    }
+    .panel h1 { font-size: 26px; color: #d94f5c; margin-bottom: 6px; }
+    .panel .sub { color: #888; font-size: 13px; margin-bottom: 16px; }
+    .panel .stat { font-size: 19px; color: #333; margin: 5px 0; }
+    .panel .stat b { color: #d94f5c; }
+    .panel .record { color: #ff9d2e; font-weight: bold; font-size: 17px; margin-top: 4px; }
+    .panel button {
+      margin: 14px 6px 0; padding: 11px 28px; font-size: 17px; font-weight: bold;
+      color: #fff; border: none; border-radius: 30px; cursor: pointer;
+    }
+    .panel button:active { transform: scale(.96); }
+    #restart { background: #d94f5c; }
+    #storyAgain { background: #d94f5c; }
+    #storyMenu { background: #8899aa; }
+    #closeSettings { background: #8899aa; }
+    #heart { font-size: 54px; margin-bottom: 4px; }
+    .storyLine { color: #444; font-size: 16px; margin: 6px 0; line-height: 1.6; }
+
+    .setRow { color: #333; font-size: 16px; margin: 6px 0; display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
+    .diffBtn { padding: 8px 18px; font-size: 15px; font-weight: bold; color: #fff; background: #9aa0a8; border: none; border-radius: 20px; cursor: pointer; }
+    .diffBtn.active { background: #d94f5c; }
+  </style>
+</head>
+<body>
+
+  <div id="score">0m</div>
+  <div id="difficulty">难度 1.0</div>
+  <div id="combo"></div>
+
+  <div id="storyWrap">
+    <div id="storyLabel">剧情</div>
+    <div id="storyBar"><div id="storyFill"></div></div>
+  </div>
+
+  <div id="coinUI">🪙 <span id="coinCount">0</span></div>
+  <button id="mute">🔊</button>
+
+  <div id="chaseUI">
+    <div id="chaseFace">辛</div>
+    <div id="chaseBar"><div id="chaseFill"></div></div>
+  </div>
+
+  <div id="skillWrap">
+    <div id="skillMeterWrap"><div id="skillMeter"></div></div>
+    <button id="skillBtn">巧闪</button>
+  </div>
+
+  <div id="dialogue"><span id="dialogueText"></span></div>
+  <div id="toast"></div>
+  <div id="flash"></div>
+
+  <div id="menu">
+    <button id="settingsBtn">⚙️</button>
+    <div id="menuInner">
+      <h1>巧慧快跑</h1>
+      <div class="sub">做给巧慧的小游戏 ❤</div>
+      <div id="bestLabel"></div>
+      <button class="btn" id="btnStory1" style="background:#d94f5c;">剧情 · 把锦囊还给辛圆</button>
+      <button class="btn" id="btnStory2" style="background:#c9583a;">剧情 · 古镇灯会</button>
+      <button class="btn" id="btnStory3" style="background:#c94a6a;">剧情 · 烟花之约</button>
+      <button class="btn" id="btnStory4" style="background:#7a8fc0;">剧情 · 初雪</button>
+      <button class="btn" id="btnStory5" style="background:#5fae9a;">剧情 · 岁岁年年</button>
+      <button class="btn" id="btnEndless">无尽跑酷</button>
+      <div class="hint">
+        手机：左右滑换道 · 上滑跳 · 下滑铲 · 双击巧闪<br>
+        电脑：←→ 换道 · ↑跳 · ↓铲 · E 巧闪
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlay">
+    <div class="panel">
+      <h1 id="failTitle">辛圆追上了巧慧</h1>
+      <div class="sub" id="failSub">（他气喘吁吁，却只是想把发带还给你）</div>
+      <div class="stat">跑动距离：<b id="final">0</b>m</div>
+      <div class="stat">收集金币：<b id="finalCoin">0</b> 枚</div>
+      <div class="stat">灵巧擦身：<b id="finalGraze">0</b> 次</div>
+      <div class="stat">总分：<b id="finalTotal">0</b></div>
+      <div class="stat">历史最佳：<b id="bestFinal">0</b>m</div>
+      <div class="record" id="newRecord" style="display:none;"></div>
+      <button id="restart">再来一局</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="storyOverlay">
+    <div class="panel">
+      <div id="heart">❤️</div>
+      <h1 id="storyTitle">锦囊里的秘密</h1>
+      <div id="storyText"></div>
+      <button id="storyAgain">再看一次剧情</button>
+      <button id="storyMenu">回主菜单</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="settingsOverlay">
+    <div class="panel">
+      <h1>设置</h1>
+      <div class="setRow">音量 <input type="range" id="volSlider" min="0" max="100" value="100" style="width:160px;"></div>
+      <div class="setRow" style="margin-top:12px;">
+        <button class="diffBtn" id="diffEasy">轻松</button>
+        <button class="diffBtn" id="diffNormal">普通</button>
+        <button class="diffBtn" id="diffHard">挑战</button>
+      </div>
+      <button id="closeSettings" style="margin-top:18px;">关闭</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.bootcdn.net/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <script>
+  'use strict';
+
+  // =====================================================================
+  // 《巧慧快跑》网页版 · 国潮古镇夜版
+  // 模式：?mode=endless 无尽跑酷，?mode=story&chapter=1~5 剧情，默认主菜单。
+  // 真实 BGM：bgm.mp3 放同目录自动替换；图标：替换 icon-512.png 为你俩合照。
+  // =====================================================================
+
+  // ---------------- 一、全局配置 ----------------
+  const CONFIG = {
+    diffCapStory: 55, passiveRiseStory: 0.7, diffEase: 3,
+    diffHitDrop: 6, diffGraze: 1.5, diffDodge: 0.5, diffCoin: 0.15, diffFloor: 5,
+    speedMin: 8,
+    chaseMax: 20, chaseDead: 4, chaseHitPenalty: 8, chaseRegen: 0.4, chaseGrazeGain: 3,
+    spawnIntervalMax: 0.85, spawnIntervalMin: 0.4, spawnIntervalRange: 0.45,
+    twoObstacleBase: 0.2, twoObstacleRange: 0.4,
+    jumpSpeed: 9.5, gravity: 28, jumpBuffer: 0.12, slideTime: 0.8,
+    laneLerp: 14, runBobFreq: 8, runBobPerSpeed: 0.5,
+    qiaoshanTime: 2.2, qiaoshanBoost: 1.5, skillPerGraze: 15, skillPerDodge: 5,
+    coinValue: 10, grazeScore: 20, comboMax: 20, comboMultCap: 10, distancePerSec: 1.2
+  };
+
+  // 难度档
+  const DIFFICULTY_PRESETS = {
+    easy:   { diffStart: 10, passiveRiseEndless: 0.9, diffCapEndless: 70, speedMax: 18 },
+    normal: { diffStart: 18, passiveRiseEndless: 1.4, diffCapEndless: 100, speedMax: 22 },
+    hard:   { diffStart: 26, passiveRiseEndless: 1.8, diffCapEndless: 100, speedMax: 24 }
+  };
+
+  // ---------------- 二、剧情章节数据 ----------------
+  const chapters = {
+    1: {
+      name: '把锦囊还给辛圆', target: 400,
+      script: [
+        { d: 0,   text: '辛圆：巧慧！那是我的幸运锦囊，还我啦！' },
+        { d: 100, text: '辛圆：里面有很重要的东西，你等等我～' },
+        { d: 200, text: '巧慧：我、我只是拿错了！你追得也太认真了吧！' },
+        { d: 300, text: '辛圆：呼…呼…我真的…快跑不动了…' }
+      ],
+      title: '锦囊里的秘密',
+      endDialogue: [
+        { who: '辛圆', text: '呼…总算追上了。这个，还给你。' },
+        { who: '巧慧', text: '诶？你不是要讨回锦囊吗？' },
+        { who: '辛圆', text: '其实…我是想把这个送给你。' }
+      ],
+      panel: ['辛圆终于追上了巧慧，', '从锦囊里拿出——一根发带。', '"这个，是给你的。那天就想送你了。"', '巧慧笑了："笨蛋，早说嘛。"'],
+      fail: { line: '呼…总算追上你了，把发带还给你～', title: '辛圆追上了巧慧', sub: '（他气喘吁吁，却只是想把发带还给你）' }
+    },
+    2: {
+      name: '古镇灯会', target: 500,
+      script: [
+        { d: 0,   text: '辛圆：巧慧！等等我，说好一起逛灯会的！' },
+        { d: 120, text: '巧慧：谁让你慢吞吞的，我先走啦～' },
+        { d: 240, text: '辛圆：呼…这个送你的糖人，都要化了！' },
+        { d: 360, text: '巧慧：笨蛋，快跟上，前面有好看的花灯！' }
+      ],
+      title: '古镇灯会',
+      endDialogue: [
+        { who: '辛圆', text: '呼…追上你了。喏，糖人，快化了。' },
+        { who: '巧慧', text: '你追得满头汗，就为了这个？' },
+        { who: '辛圆', text: '为了和你看灯呀。' }
+      ],
+      panel: ['辛圆追上巧慧，递过一个糖人。', '"化了就不好看了，快吃。"', '巧慧接过来："你追得满头汗，就为了这个？"', '辛圆笑："为了和你看灯。"'],
+      fail: { line: '呼…追上啦！喏，糖人都快化了。', title: '辛圆追上了巧慧', sub: '（他跑得满头汗，糖人还举在手里）' }
+    },
+    3: {
+      name: '烟花之约', target: 600,
+      script: [
+        { d: 0,   text: '辛圆：巧慧！今晚有烟花，一起去看！' },
+        { d: 150, text: '巧慧：来追我呀，追到了就陪你去～' },
+        { d: 300, text: '辛圆：呼…这次我可不会跟丢了！' },
+        { d: 450, text: '巧慧：快点，烟花就要开始了！' }
+      ],
+      title: '烟花之约',
+      endDialogue: [
+        { who: '辛圆', text: '呼…这次…总算追上了。' },
+        { who: '巧慧', text: '好吧，说话算话，陪你看烟花。' },
+        { who: '辛圆', text: '那，说好了，以后每年都一起看。' }
+      ],
+      panel: ['烟花在古镇上空炸开，', '巧慧和辛圆并肩站在桥头。', '"以后每年，都一起看烟花，好不好？"', '巧慧笑着点了点头。 ❤️'],
+      fail: { line: '呼…赶上了！烟花还没开始吧？', title: '辛圆追上了巧慧', sub: '（话音未落，第一朵烟花正好在天上炸开）' }
+    },
+    4: {
+      name: '初雪', target: 700,
+      script: [
+        { d: 0,   text: '辛圆：巧慧！下雪啦，快看！' },
+        { d: 180, text: '巧慧：来追我呀，雪地里跑起来好舒服～' },
+        { d: 360, text: '辛圆：呼…等等我，带你去看最大的那场雪！' },
+        { d: 540, text: '巧慧：笨蛋，你倒是快点呀！' }
+      ],
+      title: '初雪',
+      endDialogue: [
+        { who: '辛圆', text: '呼…今年的第一场雪，我们一起看到了。' },
+        { who: '巧慧', text: '嗯，初雪要许愿哦。' },
+        { who: '辛圆', text: '那，我的愿望是——明年也和你一起看雪。' }
+      ],
+      panel: ['雪花纷纷落下，古镇披上白纱。', '巧慧和辛圆在桥头看初雪。', '"初雪要许愿哦。"', '"我的愿望是——明年也和你一起看雪。" ❄️'],
+      fail: { line: '呼…追上啦！初雪里也这么能跑！', title: '辛圆追上了巧慧', sub: '（雪花落在两人肩头，哈气成霜）' }
+    },
+    5: {
+      name: '岁岁年年', target: 800,
+      script: [
+        { d: 0,   text: '辛圆：巧慧，今年也一起跑吧！' },
+        { d: 200, text: '巧慧：每年都追我，你不累呀？' },
+        { d: 400, text: '辛圆：追你，永远不累。' },
+        { d: 600, text: '巧慧：（笑）那…就跑一辈子吧。' }
+      ],
+      title: '岁岁年年',
+      endDialogue: [
+        { who: '辛圆', text: '呼…追到你了。' },
+        { who: '巧慧', text: '以后每年，都让你追。' },
+        { who: '辛圆', text: '好，岁岁年年，都追你。' }
+      ],
+      panel: ['灯火年年，古镇依旧。', '巧慧和辛圆并肩跑过一整年。', '"以后每年，都让你追。"', '"好，岁岁年年，都追你。" ❤️'],
+      fail: { line: '呼…追上了！年年都能追上你！', title: '辛圆追上了巧慧', sub: '（他笑着，把气喘匀）' }
+    }
+  };
+
+  // ---------------- 三、随机台词 ----------------
+  const LINES = {
+    start: '巧慧！把幸运锦囊还我～',
+    hit: ['别跑那么快嘛！', '哎哟，你慢点！', '我、我快追上了！', '巧慧，等等我～'],
+    near: ['嘿，挺灵活嘛！', '好险，差点！', '这招叫什么？', '不错不错！'],
+    chaseClose: ['我快追上你啦！', '就快到了，别跑！', '呼…呼…等我一下！'],
+    qiaoshan: ['又耍赖！', '你这招赖皮啊！', '慢点，我都看不清了！'],
+    shortcut: ['抄近路咯！别想甩掉我～', '这边更近，我要追上你啦！'],
+    combo5: ['连击五连！好厉害！', '哇，太灵活了吧！'],
+    combo10: '连击大师！我都要追不上啦！',
+    over: '呼…总算把发带还给你了。'
+  };
+
+  // ---------------- 四、内置古风 BGM 乐谱 ----------------
+  const MELODY = [
+    659.25, 783.99, 880, 783.99, 659.25, 587.33, 523.25, 587.33,
+    659.25, 523.25, 587.33, 659.25, 392, 440, 523.25, 0,
+    880, 783.99, 659.25, 587.33, 523.25, 587.33, 659.25, 523.25,
+    440, 523.25, 440, 392, 329.63, 392, 440, 0
+  ];
+  const BASS = [
+    130.81, 0, 0, 0, 196, 0, 0, 0, 220, 0, 0, 0, 164.81, 0, 0, 0,
+    174.61, 0, 0, 0, 130.81, 0, 0, 0, 196, 0, 0, 0, 130.81, 0, 0, 0
+  ];
+
+  const gameMode = new URLSearchParams(location.search).get('mode') || 'menu';
+  const chapter = parseInt(new URLSearchParams(location.search).get('chapter') || '1', 10);
+  const CH = chapters[chapter] || chapters[1];
+
+  let diffPreset = 'normal';
+  try { diffPreset = localStorage.getItem('qh_diff') || 'normal'; } catch (e) {}
+  const PRESET = DIFFICULTY_PRESETS[diffPreset] || DIFFICULTY_PRESETS.normal;
+
+  // ---------------- 五、音效 / 音乐模块 ----------------
+  const AudioSys = {
+    ctx: null, master: null, muted: false, volume: 1,
+    realBgm: null, useReal: false,
+    bgmTimer: null, nextTime: 0, step: 0,
+
+    tryRealBgm() {
+      const a = new Audio('bgm.mp3');
+      a.loop = true; a.volume = 0.5;
+      a.addEventListener('canplaythrough', () => {
+        this.useReal = true;
+        this._stopProcedural();
+        if (this.ctx) a.play().catch(() => {});
+      }, { once: true });
+      a.addEventListener('error', () => { this.useReal = false; });
+      this.realBgm = a;
+    },
+    unlock() {
+      if (!this.ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        try {
+          this.ctx = new AC();
+          this.master = this.ctx.createGain();
+          this.master.gain.value = this.muted ? 0 : this.volume;
+          this.master.connect(this.ctx.destination);
+          this._startBgm();
+        } catch (e) { return; }
+      } else if (this.ctx.state === 'suspended') {
+        this.ctx.resume();
+      }
+      if (this.useReal && this.realBgm) this.realBgm.play().catch(() => {});
+    },
+    setMuted(m) {
+      this.muted = m;
+      if (this.master) this.master.gain.value = m ? 0 : this.volume;
+      if (this.realBgm) this.realBgm.muted = m;
+    },
+    setVolume(v) {
+      this.volume = v;
+      if (this.master && !this.muted) this.master.gain.value = v;
+      if (this.realBgm) this.realBgm.volume = 0.5 * v;
+    },
+    tone(freq, dur, type, vol, when) {
+      if (!this.ctx || this.muted) return;
+      const t = (when != null) ? when : this.ctx.currentTime;
+      const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.type = type || 'sine'; o.frequency.value = freq;
+      g.gain.setValueAtTime(vol || 0.2, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(this.master);
+      o.start(t); o.stop(t + dur + 0.03);
+    },
+    _stopProcedural() { if (this.bgmTimer) { clearInterval(this.bgmTimer); this.bgmTimer = null; } },
+    _startBgm() {
+      if (this.bgmTimer || this.useReal || !this.ctx) return;
+      this.nextTime = this.ctx.currentTime + 0.1;
+      this.step = 0;
+      this.bgmTimer = setInterval(() => this._schedule(), 50);
+    },
+    _schedule() {
+      if (this.muted || !this.ctx) return;
+      const stepDur = 0.21;
+      while (this.nextTime < this.ctx.currentTime + 0.16) {
+        this._playStep(this.step, this.nextTime);
+        this.nextTime += stepDur;
+        this.step = (this.step + 1) % 32;
+      }
+    },
+    _playStep(s, when) {
+      const m = MELODY[s];
+      if (m > 0) this.tone(m, 0.24, 'triangle', 0.06, when);
+      if (s % 4 === 0 && BASS[s] > 0) this.tone(BASS[s], 0.5, 'sine', 0.05, when);
+      if (s % 8 === 0) this.tone(90, 0.15, 'sine', 0.09, when);
+      if (s % 2 === 0) this.tone(9000, 0.02, 'square', 0.006, when);
+    },
+    jump()  { this.tone(420, 0.15, 'square', 0.1); this.tone(620, 0.12, 'square', 0.07); },
+    slide() { this.tone(220, 0.2, 'sawtooth', 0.09); },
+    coin()  { this.tone(880, 0.08, 'sine', 0.14); this.tone(1320, 0.1, 'sine', 0.1); },
+    graze() { this.tone(1200, 0.08, 'triangle', 0.12); },
+    hit()   { this.tone(150, 0.25, 'sawtooth', 0.18); },
+    smoke() { this.tone(300, 0.3, 'sine', 0.1); },
+    qiaoshan() { this.tone(660, 0.1, 'sine', 0.14); this.tone(990, 0.12, 'sine', 0.14); this.tone(1320, 0.16, 'sine', 0.12); },
+    over() { this.tone(500, 0.2, 'triangle', 0.14); this.tone(400, 0.2, 'triangle', 0.14); this.tone(300, 0.4, 'triangle', 0.14); },
+    win()  { this.tone(660, 0.12, 'sine', 0.12); this.tone(880, 0.12, 'sine', 0.12); this.tone(1100, 0.2, 'sine', 0.12); }
+  };
+  AudioSys.tryRealBgm();
+
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+  // ---------------- 六、主程序 ----------------
+  function init() {
+
+    // 1. 场景 / 相机 / 渲染器（夜晚氛围）
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x2e3f66);
+    scene.fog = new THREE.Fog(0x2e3f66, 30, 110);
+    const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 300);
+    camera.position.set(0, 5.5, 14);
+    camera.lookAt(0, 1.1, -10);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    document.body.appendChild(renderer.domElement);
+
+    // 2. 灯光（月光 + 冷色环境）
+    scene.add(new THREE.AmbientLight(0xcdd6ee, 0.6));
+    const moonLight = new THREE.DirectionalLight(0xbfd0ee, 0.5);
+    moonLight.position.set(6, 15, 10);
+    scene.add(moonLight);
+
+    // 3. 石板路与车道
+    const road = new THREE.Mesh(new THREE.PlaneGeometry(7, 400), new THREE.MeshLambertMaterial({ color: 0x565d6b }));
+    road.rotation.x = -Math.PI / 2; road.position.set(0, 0, -180); scene.add(road);
+    for (const side of [-1, 1]) {
+      const stone = new THREE.Mesh(new THREE.PlaneGeometry(20, 400), new THREE.MeshLambertMaterial({ color: 0x6e6a63 }));
+      stone.rotation.x = -Math.PI / 2; stone.position.set(side * 13.5, -0.02, -180); scene.add(stone);
+    }
+    for (const x of [-1.1, 1.1]) {
+      const line = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.03, 400), new THREE.MeshLambertMaterial({ color: 0xcfc4a8 }));
+      line.position.set(x, 0.02, -180); scene.add(line);
+    }
+    const lanes = [-2.2, 0, 2.2];
+
+    // 4. 游戏状态
+    let targetLane = 1;
+    let playerY = 0, vy = 0;
+    let sliding = false, slideTimer = 0, invuln = 0;
+    let jumpBuffer = 0, landSquash = 0;
+    let elapsed = 0, distance = 0;
+    let chase = CONFIG.chaseMax;
+    let difficulty = PRESET.diffStart, diffTarget = PRESET.diffStart;
+    const DIFF_CAP = gameMode === 'story' ? CONFIG.diffCapStory : PRESET.diffCapEndless;
+    const PASSIVE_RISE = gameMode === 'story' ? CONFIG.passiveRiseStory : PRESET.passiveRiseEndless;
+    let speed = CONFIG.speedMin;
+    let coinCount = 0, coinScore = 0;
+    let nearMissCount = 0, skillScore = 0;
+    let combo = 0, comboTimer = 0;
+    let skillMeter = 0, qiaoshanTimer = 0;
+    let shielded = false, magnetTimer = 0, chiliTimer = 0;
+    let combo5Shown = false, combo10Shown = false, noHit = true;
+    let spawnTimer = 0.6, coinTimer = 1.5, itemTimer = 8;
+    let coinRainTimer = 22, shortcutTimer = 15, chaseSayTimer = 3;
+    let fireworkTimer = 3;
+    let storyStep = 0;
+    let over = (gameMode === 'menu');
+    let cutscene = null, pendingChapter = chapter;
+    const snowActive = (gameMode === 'story' && chapter === 4);
+
+    let bestDist = 0;
+    try { bestDist = parseInt(localStorage.getItem('qh_best') || '0', 10); } catch (e) {}
+    function saveBest(d) {
+      if (d > bestDist) bestDist = d;
+      try { localStorage.setItem('qh_best', String(bestDist)); } catch (e) {}
+    }
+    function multiplier() { return 1 + Math.min(combo, CONFIG.comboMultCap) * 0.1; }
+
+    // 5. 角色建模
+    const skinMat  = new THREE.MeshLambertMaterial({ color: 0xf4c8a0 });
+    const qHairM   = new THREE.MeshLambertMaterial({ color: 0x2b2b33 });
+    const qJacketM = new THREE.MeshLambertMaterial({ color: 0xd94f5c });
+    const qPantsM  = new THREE.MeshLambertMaterial({ color: 0x2f4a6b });
+    const qShoeM   = new THREE.MeshLambertMaterial({ color: 0xffffff });
+    const qBandM   = new THREE.MeshLambertMaterial({ color: 0xff5a5f });
+    const skirtM   = new THREE.MeshLambertMaterial({ color: 0xc04552 });
+    const cheekM   = new THREE.MeshLambertMaterial({ color: 0xf2a0a0 });
+    const mouthM   = new THREE.MeshLambertMaterial({ color: 0x7a3a3a });
+    const trimM    = new THREE.MeshLambertMaterial({ color: 0xffffff });
+    const eyeM     = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
+    const xHairM   = new THREE.MeshLambertMaterial({ color: 0x1f1f26 });
+    const xJacketM = new THREE.MeshLambertMaterial({ color: 0x3a6ea5 });
+    const xPantsM  = new THREE.MeshLambertMaterial({ color: 0x2e2e36 });
+    const xShoeM   = new THREE.MeshLambertMaterial({ color: 0x3a3a44 });
+    const darkM    = new THREE.MeshLambertMaterial({ color: 0x111111 });
+    const bagM     = new THREE.MeshLambertMaterial({ color: 0x2c5a3a });
+    const strapM   = new THREE.MeshLambertMaterial({ color: 0x222222 });
+
+    function buildCharacter(o) {
+      const g = new THREE.Group();
+      const legGeo = new THREE.BoxGeometry(0.15, 0.42, 0.17);
+      const shoeGeo = new THREE.BoxGeometry(0.17, 0.08, 0.26);
+      const legL = new THREE.Group(), legR = new THREE.Group();
+      for (const [lg, side] of [[legL, -0.11], [legR, 0.11]]) {
+        const l = new THREE.Mesh(legGeo, o.pants); l.position.y = -0.21;
+        const s = new THREE.Mesh(shoeGeo, o.shoe); s.position.set(0, -0.43, 0.05);
+        lg.add(l, s); lg.position.set(side, 0.45, 0); g.add(lg);
+      }
+      const up = new THREE.Group(); up.position.y = 0.45;
+      const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 0.55, 14), o.jacket);
+      torso.position.y = 0.27; up.add(torso);
+      const zip = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.5, 0.03), o.trim);
+      zip.position.set(0, 0.27, -0.2); up.add(zip);
+      const armL = new THREE.Group(), armR = new THREE.Group();
+      for (const [ag, side] of [[armL, -0.3], [armR, 0.3]]) {
+        const a = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.32, 0.13), o.jacket); a.position.y = -0.16;
+        const h = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 10), o.skin); h.position.y = -0.33;
+        ag.add(a, h); ag.position.set(side, 0.53, 0); up.add(ag);
+      }
+      const headG = new THREE.Group(); headG.position.y = 0.85;
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 20, 20), o.skin); headG.add(head);
+      const hair = new THREE.Mesh(new THREE.SphereGeometry(0.28, 20, 20), o.hair);
+      hair.scale.set(1.02, 0.9, 1.1); hair.position.set(0, 0.08, 0.07); headG.add(hair);
+      if (o.band) {
+        const band = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.04, 10, 24), o.band);
+        band.rotation.x = Math.PI / 2; band.position.y = 0.18; headG.add(band);
+      }
+      const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 8), o.eye);
+      eyeL.position.set(-0.09, 0.03, -0.23);
+      const eyeR = eyeL.clone(); eyeR.position.x = 0.09;
+      headG.add(eyeL, eyeR);
+      const cheekL = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), o.cheek);
+      cheekL.position.set(-0.11, -0.05, -0.2);
+      const cheekR = cheekL.clone(); cheekR.position.x = 0.11;
+      headG.add(cheekL, cheekR);
+      const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.02, 0.02), o.mouth);
+      mouth.position.set(0, -0.1, -0.25);
+      headG.add(mouth);
+      up.add(headG); g.add(up);
+      return { group: g, up, legL, legR, armL, armR, headG };
+    }
+
+    // 巧慧：红上衣 + 短裙 + 高马尾 + 红发带
+    const q = buildCharacter({ skin: skinMat, hair: qHairM, jacket: qJacketM, pants: qPantsM, shoe: qShoeM, band: qBandM, trim: trimM, eye: eyeM, cheek: cheekM, mouth: mouthM });
+    const player = q.group;
+    const skirt = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.32, 12), skirtM);
+    skirt.position.y = 0.42; player.add(skirt);
+    const pony = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.02, 0.34, 8), qHairM);
+    pony.position.set(0, 0.2, 0.2); pony.rotation.x = 0.5; q.headG.add(pony);
+    const tie = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), qBandM);
+    tie.position.set(0, 0.2, 0.14); q.headG.add(tie);
+    const aura = new THREE.Mesh(new THREE.SphereGeometry(1.1, 18, 18), new THREE.MeshBasicMaterial({ color: 0xffe066, transparent: true, opacity: 0.35 }));
+    aura.position.y = 1.0; aura.visible = false; player.add(aura);
+    const shieldMesh = new THREE.Mesh(new THREE.SphereGeometry(0.8, 16, 16), new THREE.MeshBasicMaterial({ color: 0x6ec6ff, transparent: true, opacity: 0.25 }));
+    shieldMesh.position.y = 1.0; shieldMesh.visible = false; player.add(shieldMesh);
+    player.position.set(0, 0, 0); scene.add(player);
+
+    // 辛圆：蓝外套 + 圆框眼镜 + 斜挎包
+    const x = buildCharacter({ skin: skinMat, hair: xHairM, jacket: xJacketM, pants: xPantsM, shoe: xShoeM, trim: trimM, eye: eyeM, cheek: cheekM, mouth: mouthM });
+    const gl = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.012, 8, 16), darkM);
+    gl.position.set(-0.08, 0.03, -0.22);
+    const gr = gl.clone(); gr.position.x = 0.08;
+    x.headG.add(gl, gr);
+    const bag = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.26, 0.1), bagM);
+    bag.position.set(-0.13, 0.3, 0.2); x.up.add(bag);
+    const strap = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.5, 0.02), strapM);
+    strap.position.set(0.12, 0.25, 0.1); x.up.add(strap);
+    const chaser = x.group;
+    chaser.scale.setScalar(0.9); scene.add(chaser);
+
+    function poseCharacter(c, sliding, airborne, t, freq) {
+      const swing = Math.sin(t * freq);
+      if (sliding) {
+        c.up.position.y = 0.15; c.up.rotation.x = -0.7;
+        c.headG.position.y = 0.55;
+        c.legL.rotation.x = -1.3; c.legR.rotation.x = -1.0;
+        c.armL.rotation.x = 0.9; c.armR.rotation.x = 1.1;
+      } else if (airborne) {
+        c.up.position.y = 0.45; c.up.rotation.x = 0;
+        c.headG.position.y = 0.85;
+        c.legL.rotation.x = 0.7; c.legR.rotation.x = 0.5;
+        c.armL.rotation.x = -1.0; c.armR.rotation.x = -1.0;
+      } else {
+        c.up.position.y = 0.45 + Math.sin(t * freq * 2) * 0.03;
+        c.up.rotation.x = 0;
+        c.headG.position.y = 0.85;
+        c.legL.rotation.x = swing * 0.6; c.legR.rotation.x = -swing * 0.6;
+        c.armL.rotation.x = -swing * 0.5; c.armR.rotation.x = swing * 0.5;
+      }
+    }
+
+    // 6. 国潮古镇街景 + 天空（夜晚）
+    const wallMat    = new THREE.MeshLambertMaterial({ color: 0xcbbfae });
+    const roofMat    = new THREE.MeshLambertMaterial({ color: 0x33333d });
+    const woodMat    = new THREE.MeshLambertMaterial({ color: 0x5a3d24 });
+    const lanternMat = new THREE.MeshLambertMaterial({ color: 0xe8453c, emissive: 0x8a1608 });
+    const trunkMat   = new THREE.MeshLambertMaterial({ color: 0x4a3a26 });
+    const treeMat    = new THREE.MeshLambertMaterial({ color: 0x3f6b34 });
+
+    function makeAncientHouse(side) {
+      const g = new THREE.Group();
+      const w = 2 + Math.random() * 1.5, h = 3 + Math.random() * 3, d = 2 + Math.random() * 1.5;
+      const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
+      body.position.y = h / 2;
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(w + 0.5, 0.45, d + 0.5), roofMat);
+      roof.position.y = h + 0.22;
+      const door = new THREE.Mesh(new THREE.BoxGeometry(0.06, h * 0.4, d * 0.35), woodMat);
+      door.position.set(-side * (w / 2 + 0.04), h * 0.35, 0);
+      const lantern = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 10), lanternMat);
+      lantern.position.set(-side * (w / 2 + 0.2), h + 0.05, d / 2 - 0.2);
+      g.add(body, roof, door, lantern);
+      return g;
+    }
+    function makeTree() {
+      const g = new THREE.Group();
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.2, 1, 8), trunkMat);
+      trunk.position.y = 0.5;
+      const crown = new THREE.Mesh(new THREE.SphereGeometry(0.8, 10, 10), treeMat);
+      crown.position.y = 1.45;
+      g.add(trunk, crown);
+      return g;
+    }
+    function makeLanternPole() {
+      const g = new THREE.Group();
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 2.2, 8), woodMat);
+      pole.position.y = 1.1;
+      const lantern = new THREE.Mesh(new THREE.SphereGeometry(0.25, 10, 10), lanternMat);
+      lantern.position.y = 2.3;
+      g.add(pole, lantern);
+      return g;
+    }
+    const makers = [(side) => makeAncientHouse(side), () => makeTree(), () => makeLanternPole()];
+    const sideProps = [];
+    for (let i = 0; i < 12; i++) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const g = makers[i % 3](side);
+      g.position.set(side * (4.5 + Math.random() * 3), 0, -Math.random() * 100);
+      sideProps.push({ g, side });
+      scene.add(g);
+    }
+
+    const overheadProps = [];
+    for (let i = 0; i < 5; i++) {
+      const g = new THREE.Group();
+      const wire = new THREE.Mesh(new THREE.BoxGeometry(7.5, 0.04, 0.04), roofMat);
+      wire.position.y = 3.7; g.add(wire);
+      for (const lx of [-2.2, 0, 2.2]) {
+        const l = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 10), lanternMat);
+        l.position.set(lx, 3.25, 0); g.add(l);
+      }
+      g.position.set(0, 0, -20 - i * 18);
+      overheadProps.push(g); scene.add(g);
+    }
+
+    // 月亮与夜云
+    const moonMat = new THREE.MeshBasicMaterial({ color: 0xfff2d8 }); moonMat.fog = false;
+    const moonMesh = new THREE.Mesh(new THREE.SphereGeometry(1.5, 16, 16), moonMat);
+    moonMesh.position.set(6, 17, -26); scene.add(moonMesh);
+    const cloudMat = new THREE.MeshBasicMaterial({ color: 0xcfd8ee, transparent: true, opacity: 0.5 }); cloudMat.fog = false;
+    for (let i = 0; i < 4; i++) {
+      const c = new THREE.Mesh(new THREE.SphereGeometry(1 + Math.random(), 10, 10), cloudMat);
+      c.scale.set(2, 0.7, 1.2);
+      c.position.set(-9 + i * 6, 17 + Math.random() * 4, -30 - i * 8);
+      scene.add(c);
+    }
+
+    // 7. 障碍物（四种）
+    const blockMat   = new THREE.MeshLambertMaterial({ color: 0xe2574c });
+    const barMat     = new THREE.MeshLambertMaterial({ color: 0xf2b134 });
+    const hurdleMat  = new THREE.MeshLambertMaterial({ color: 0x4caf50 });
+    const moverMat   = new THREE.MeshLambertMaterial({ color: 0xff7f3f });
+    const obstacles = [];
+    function spawnObstacle(lane) {
+      const r = Math.random();
+      let type, mesh;
+      if (r < 0.3) type = 'block';
+      else if (r < 0.55) type = 'bar';
+      else if (r < 0.8) type = 'hurdle';
+      else type = 'mover';
+      if (type === 'block' || type === 'mover') {
+        mesh = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1, 0.8), type === 'mover' ? moverMat : blockMat);
+        mesh.position.set(lanes[lane], 0.5, -70);
+        if (type === 'mover') {
+          const mark = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.1, 0.06), barMat);
+          mark.position.set(0, 0.4, 0.41); mesh.add(mark);
+        }
+      } else if (type === 'bar') {
+        mesh = new THREE.Group();
+        const bar = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.25, 0.5), barMat); bar.position.y = 1.15;
+        const p1 = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.15, 0.1), barMat); p1.position.set(-0.4, 0.575, 0);
+        const p2 = p1.clone(); p2.position.x = 0.4;
+        mesh.add(bar, p1, p2); mesh.position.set(lanes[lane], 0, -70);
+      } else {
+        mesh = new THREE.Group();
+        const hbar = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.1, 0.3), hurdleMat); hbar.position.y = 0.4;
+        const hp1 = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.4, 0.06), hurdleMat); hp1.position.set(-0.4, 0.2, 0);
+        const hp2 = hp1.clone(); hp2.position.x = 0.4;
+        mesh.add(hbar, hp1, hp2); mesh.position.set(lanes[lane], 0, -70);
+      }
+      obstacles.push({ mesh, type, lane, hit: false, passed: false, movePhase: Math.random() * Math.PI * 2 });
+      scene.add(mesh);
+    }
+    function spawnWave() {
+      const order = [0, 1, 2];
+      for (let i = order.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [order[i], order[j]] = [order[j], order[i]];
+      }
+      const count = Math.random() < (CONFIG.twoObstacleBase + (difficulty / 100) * CONFIG.twoObstacleRange) ? 2 : 1;
+      for (let i = 0; i < count; i++) spawnObstacle(order[i]);
+    }
+
+    // 8. 金币与道具
+    const coinMat = new THREE.MeshLambertMaterial({ color: 0xffd23e, emissive: 0x664400 });
+    const coinGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.06, 20);
+    const coins = [];
+    function spawnCoinLine(lane) {
+      const n = 4 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < n; i++) {
+        const m = new THREE.Mesh(coinGeo, coinMat);
+        m.rotation.x = Math.PI / 2;
+        m.position.set(lanes[lane], 0.7, -72 - i * 1.5);
+        coins.push({ mesh: m, phase: Math.random() * Math.PI * 2 });
+        scene.add(m);
+      }
+    }
+    const shieldItemMat = new THREE.MeshLambertMaterial({ color: 0x6ec6ff, emissive: 0x123456 });
+    const magnetItemMat = new THREE.MeshLambertMaterial({ color: 0xff8fb0, emissive: 0x4a1030 });
+    const chiliItemMat  = new THREE.MeshLambertMaterial({ color: 0xff5a3c, emissive: 0x3a1000 });
+    const smokeItemMat  = new THREE.MeshLambertMaterial({ color: 0x9aa0a8, emissive: 0x202020 });
+    const items = [];
+    function spawnItem(lane, type) {
+      let mesh;
+      if (type === 'shield') mesh = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 12), shieldItemMat);
+      else if (type === 'magnet') mesh = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.12, 0.2), magnetItemMat);
+      else if (type === 'chili') mesh = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.4, 8), chiliItemMat);
+      else mesh = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 12), smokeItemMat);
+      mesh.position.set(lanes[lane], 0.7, -70);
+      items.push({ mesh, type });
+      scene.add(mesh);
+    }
+    function applyItem(type) {
+      if (type === 'shield') { shielded = true; showToast('护盾！挡一次碰撞'); AudioSys.coin(); }
+      else if (type === 'magnet') { magnetTimer = 10; showToast('磁力发卡！吸金币'); AudioSys.coin(); }
+      else if (type === 'chili') { chiliTimer = 5; showToast('冲刺辣椒！加速撞障碍'); AudioSys.qiaoshan(); }
+      else { chase = Math.min(CONFIG.chaseMax, chase + 6); showToast('烟雾弹！辛圆迷路了'); AudioSys.smoke(); }
+    }
+
+    // 9. 粒子系统（尘土/擦身圈/烟花/雪花）
+    const particles = [];
+    function emitParticle(mesh, vx, vy, vz, life, gravity, grow) {
+      particles.push({ mesh, vx, vy, vz, life, maxLife: life, gravity: gravity || 0, grow: !!grow });
+      scene.add(mesh);
+    }
+    function updateParticles(dt) {
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.life -= dt;
+        if (p.life <= 0) { scene.remove(p.mesh); particles.splice(i, 1); continue; }
+        p.mesh.position.x += p.vx * dt;
+        p.mesh.position.y += p.vy * dt;
+        p.mesh.position.z += p.vz * dt;
+        if (p.gravity) p.vy -= p.gravity * dt;
+        if (p.grow) {
+          const k = 1 - p.life / p.maxLife;
+          p.mesh.scale.setScalar(0.4 + k * 1.6);
+          if (p.mesh.material) p.mesh.material.opacity = Math.max(0, p.life / p.maxLife) * 0.7;
+        } else {
+          p.mesh.scale.setScalar(Math.max(0.01, p.life / p.maxLife));
+        }
+      }
+    }
+    const dustGeo = new THREE.SphereGeometry(0.07, 6, 6);
+    const dustMat = new THREE.MeshLambertMaterial({ color: 0x999080 });
+    function spawnDust() {
+      for (let i = 0; i < 5; i++) {
+        const m = new THREE.Mesh(dustGeo, dustMat);
+        m.position.set(player.position.x + (Math.random() - 0.5) * 0.5, 0.1, 0.2);
+        emitParticle(m, (Math.random() - 0.5) * 2, 0.6 + Math.random() * 1.2, (Math.random() - 0.5), 0.5, 5);
+      }
+    }
+    const ringGeo = new THREE.RingGeometry(0.35, 0.5, 24);
+    function spawnGrazeRing() {
+      const m = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7 }));
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(player.position.x, 0.05, 0);
+      emitParticle(m, 0, 0, 0, 0.4, 0, true);
+    }
+    // 烟花
+    const fireworkGeo = new THREE.SphereGeometry(0.08, 6, 6);
+    const fireworkMats = [
+      new THREE.MeshBasicMaterial({ color: 0xffd23e }),
+      new THREE.MeshBasicMaterial({ color: 0xff5a5f }),
+      new THREE.MeshBasicMaterial({ color: 0xff8fb0 }),
+      new THREE.MeshBasicMaterial({ color: 0xffffff })
+    ];
+    function spawnFirework() {
+      const cx = (Math.random() - 0.5) * 8, cy = 7 + Math.random() * 5, cz = -18 - Math.random() * 30;
+      const mat = fireworkMats[Math.floor(Math.random() * fireworkMats.length)];
+      for (let i = 0; i < 16; i++) {
+        const m = new THREE.Mesh(fireworkGeo, mat);
+        m.position.set(cx, cy, cz);
+        const ang = Math.random() * Math.PI * 2;
+        const sp = 1.5 + Math.random() * 2.5;
+        emitParticle(m, Math.cos(ang) * sp, 1 + Math.random() * 2, Math.sin(ang) * sp, 1.2, 3);
+      }
+    }
+    // 雪花（第4关）
+    const snowGeo = new THREE.SphereGeometry(0.06, 6, 6);
+    const snowMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 });
+    const snow = [];
+    for (let i = 0; i < 70; i++) {
+      const m = new THREE.Mesh(snowGeo, snowMat);
+      m.position.set((Math.random() - 0.5) * 14, Math.random() * 9, -Math.random() * 80);
+      m.visible = snowActive;
+      snow.push({ mesh: m, phase: Math.random() * Math.PI * 2 });
+      scene.add(m);
+    }
+    function updateSnow(dt) {
+      if (!snowActive) return;
+      for (const s of snow) {
+        s.mesh.position.y -= 2.4 * dt;
+        s.mesh.position.x += Math.sin(elapsed * 1.5 + s.phase) * 0.5 * dt;
+        if (s.mesh.position.y < 0) { s.mesh.position.y = 8 + Math.random() * 2; s.mesh.position.x = (Math.random() - 0.5) * 14; s.mesh.position.z = -Math.random() * 80; }
+      }
+    }
+
+    // 10. 对话气泡
+    const dialogueEl = document.getElementById('dialogue');
+    const dialogueText = document.getElementById('dialogueText');
+    let lastSay = 0, dialogueTimer;
+    function say(text, force) {
+      const now = performance.now() / 1000;
+      if (!force && now - lastSay < 1.8) return;
+      lastSay = now;
+      dialogueText.textContent = text;
+      dialogueEl.classList.add('show');
+      clearTimeout(dialogueTimer);
+      dialogueTimer = setTimeout(() => dialogueEl.classList.remove('show'), 2400);
+    }
+
+    // 11. 界面
+    const scoreEl = document.getElementById('score');
+    const diffEl = document.getElementById('difficulty');
+    const fillEl = document.getElementById('chaseFill');
+    const coinCountEl = document.getElementById('coinCount');
+    const comboEl = document.getElementById('combo');
+    const skillMeterEl = document.getElementById('skillMeter');
+    const skillBtn = document.getElementById('skillBtn');
+    const storyFill = document.getElementById('storyFill');
+    const toast = document.getElementById('toast');
+    const flashEl = document.getElementById('flash');
+    let toastTimer;
+
+    function showToast(text) {
+      toast.textContent = text; toast.style.opacity = 1;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { toast.style.opacity = 0; }, 700);
+    }
+    function flash() { flashEl.style.opacity = 0.45; setTimeout(() => { flashEl.style.opacity = 0; }, 120); }
+
+    function updateUI() {
+      scoreEl.textContent = Math.floor(distance) + 'm';
+      diffEl.textContent = '难度 ' + (difficulty / 10).toFixed(1);
+      coinCountEl.textContent = coinCount;
+      const p = Math.max(0, Math.min(1, (chase - CONFIG.chaseDead) / (CONFIG.chaseMax - CONFIG.chaseDead)));
+      fillEl.style.height = (p * 100) + '%';
+      fillEl.style.background = 'hsl(' + Math.floor(p * 120) + ', 65%, 50%)';
+      skillMeterEl.style.height = skillMeter + '%';
+      const ready = skillMeter >= 100;
+      skillBtn.classList.toggle('ready', ready);
+      skillBtn.textContent = ready ? '巧闪！' : Math.floor(skillMeter) + '%';
+      if (combo >= 2) { comboEl.style.opacity = 1; comboEl.textContent = '连击 x' + combo + '（×' + multiplier().toFixed(1) + '）'; }
+      else comboEl.style.opacity = 0;
+      if (gameMode === 'story') storyFill.style.width = Math.min(100, distance / CH.target * 100) + '%';
+    }
+
+    // 12. 操作
+    function changeLane(d) { targetLane = Math.max(0, Math.min(2, targetLane + d)); }
+    function jump() {
+      jumpBuffer = CONFIG.jumpBuffer;
+      if (playerY <= 0.01) { vy = CONFIG.jumpSpeed; jumpBuffer = 0; AudioSys.jump(); }
+    }
+    function slide() { sliding = true; slideTimer = CONFIG.slideTime; AudioSys.slide(); if (playerY > 0.01) vy = -20; }
+    function tryQiaoshan() {
+      if (over) return;
+      if (skillMeter >= 100) {
+        skillMeter = 0; qiaoshanTimer = CONFIG.qiaoshanTime;
+        AudioSys.qiaoshan(); flash();
+        say(pick(LINES.qiaoshan), true);
+        showToast('巧闪！无敌 + 吸附金币');
+      }
+    }
+
+    addEventListener('keydown', (e) => {
+      AudioSys.unlock();
+      const k = e.key;
+      if (k === 'ArrowLeft' || k === 'a' || k === 'A') changeLane(-1);
+      else if (k === 'ArrowRight' || k === 'd' || k === 'D') changeLane(1);
+      else if (k === 'ArrowUp' || k === 'w' || k === 'W' || k === ' ') { jump(); e.preventDefault(); }
+      else if (k === 'ArrowDown' || k === 's' || k === 'S') slide();
+      else if (k === 'e' || k === 'E') tryQiaoshan();
+      else if (k === 'r' || k === 'R') location.search = '?mode=' + gameMode + (gameMode === 'story' ? '&chapter=' + chapter : '');
+    });
+
+    let ts = null, lastTap = 0;
+    function registerTap() {
+      const now = performance.now();
+      if (now - lastTap < 300) tryQiaoshan();
+      lastTap = now;
+    }
+    renderer.domElement.addEventListener('touchstart', (e) => {
+      AudioSys.unlock();
+      const t = e.touches[0]; ts = { x: t.clientX, y: t.clientY };
+      e.preventDefault();
+    }, { passive: false });
+    renderer.domElement.addEventListener('touchend', (e) => {
+      if (!ts) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - ts.x, dy = t.clientY - ts.y;
+      const ax = Math.abs(dx), ay = Math.abs(dy);
+      if (Math.max(ax, ay) < 12) registerTap();
+      else if (Math.max(ax, ay) > 24) {
+        if (ax > ay) changeLane(dx > 0 ? 1 : -1);
+        else if (dy < 0) jump();
+        else slide();
+      }
+      ts = null;
+      e.preventDefault();
+    }, { passive: false });
+    renderer.domElement.addEventListener('click', () => { AudioSys.unlock(); registerTap(); });
+
+    document.getElementById('skillBtn').onclick = () => { AudioSys.unlock(); tryQiaoshan(); };
+    document.getElementById('mute').onclick = () => {
+      AudioSys.unlock();
+      AudioSys.setMuted(!AudioSys.muted);
+      document.getElementById('mute').textContent = AudioSys.muted ? '🔇' : '🔊';
+    };
+
+    // 菜单 / 结算 / 设置按钮
+    document.getElementById('menu').style.display = (gameMode === 'menu') ? 'flex' : 'none';
+    document.getElementById('bestLabel').textContent = bestDist > 0 ? ('🏆 最佳成绩：' + bestDist + 'm') : '';
+    document.getElementById('btnEndless').onclick = () => { location.search = '?mode=endless'; };
+    for (let i = 1; i <= 5; i++) {
+      document.getElementById('btnStory' + i).onclick = () => { location.search = '?mode=story&chapter=' + i; };
+    }
+    document.getElementById('restart').onclick = () => { location.search = '?mode=' + gameMode + (gameMode === 'story' ? '&chapter=' + chapter : ''); };
+    document.getElementById('storyAgain').onclick = () => { location.search = '?mode=story&chapter=' + chapter; };
+    document.getElementById('storyMenu').onclick = () => { location.href = location.pathname; };
+    document.getElementById('settingsBtn').onclick = () => { document.getElementById('settingsOverlay').style.display = 'flex'; };
+    document.getElementById('closeSettings').onclick = () => { document.getElementById('settingsOverlay').style.display = 'none'; };
+
+    // 设置：音量
+    let savedVol = 100;
+    try { savedVol = parseInt(localStorage.getItem('qh_vol') || '100', 10); } catch (e) {}
+    document.getElementById('volSlider').value = savedVol;
+    AudioSys.setVolume(savedVol / 100);
+    document.getElementById('volSlider').oninput = (e) => {
+      AudioSys.setVolume(e.target.value / 100);
+      try { localStorage.setItem('qh_vol', e.target.value); } catch (err) {}
+    };
+    // 设置：难度档
+    document.getElementById('diffEasy').classList.toggle('active', diffPreset === 'easy');
+    document.getElementById('diffNormal').classList.toggle('active', diffPreset === 'normal');
+    document.getElementById('diffHard').classList.toggle('active', diffPreset === 'hard');
+    function setDiff(p) {
+      try { localStorage.setItem('qh_diff', p); } catch (e) {}
+      location.reload();
+    }
+    document.getElementById('diffEasy').onclick = () => setDiff('easy');
+    document.getElementById('diffNormal').onclick = () => setDiff('normal');
+    document.getElementById('diffHard').onclick = () => setDiff('hard');
+
+    if (gameMode === 'story') {
+      document.getElementById('storyWrap').style.display = 'block';
+      document.getElementById('storyLabel').textContent = CH.name;
+    }
+
+    // 13. 碰撞判定
+    function isColliding(ob) {
+      const oz = ob.mesh.position.z;
+      if (Math.abs(oz) > 0.6) return false;
+      if (Math.abs(player.position.x - ob.mesh.position.x) > 0.75) return false;
+      const pTop = playerY + (sliding ? 0.45 : 1.1);
+      if (ob.type === 'bar') return pTop > 1.0;
+      if (ob.type === 'hurdle') return playerY < 0.45;
+      return playerY < 1.0;
+    }
+
+    // 14. 结算与结局
+    function endGame() {
+      over = true; AudioSys.over();
+      let failLine = LINES.over, failTitle = '辛圆追上了巧慧', failSub = '（他气喘吁吁，却只是想把发带还给你）';
+      if (gameMode === 'story' && CH.fail) {
+        failLine = CH.fail.line; failTitle = CH.fail.title; failSub = CH.fail.sub;
+      }
+      say(failLine, true);
+      document.getElementById('failTitle').textContent = failTitle;
+      document.getElementById('failSub').textContent = failSub;
+      const dist = Math.floor(distance);
+      const total = dist + coinScore + skillScore;
+      const isNew = dist > bestDist;
+      document.getElementById('final').textContent = dist;
+      document.getElementById('finalCoin').textContent = coinCount;
+      document.getElementById('finalGraze').textContent = nearMissCount;
+      document.getElementById('finalTotal').textContent = total;
+      document.getElementById('bestFinal').textContent = Math.max(bestDist, dist);
+      let recordText = '';
+      if (isNew) recordText += '🎉 新纪录！ ';
+      if (noHit && dist > 200) recordText += '🏅 无伤通关！';
+      document.getElementById('newRecord').textContent = recordText.trim();
+      document.getElementById('newRecord').style.display = recordText ? 'block' : 'none';
+      saveBest(dist);
+      document.getElementById('overlay').style.display = 'flex';
+    }
+    function showStoryPanel(chIdx) {
+      const c = chapters[chIdx];
+      document.getElementById('storyTitle').textContent = c.title;
+      document.getElementById('storyText').innerHTML = c.panel.map((l) => '<p class="storyLine">' + l + '</p>').join('');
+      document.getElementById('storyOverlay').style.display = 'flex';
+    }
+    function endStory() {
+      over = true; AudioSys.win();
+      pendingChapter = chapter;
+      cutscene = { t: 0, lineIdx: 0, fw: 0, from: { x: chaser.position.x, z: chaser.position.z }, to: { x: player.position.x + 0.7, z: 0.7 } };
+    }
+
+    if (gameMode !== 'menu') setTimeout(() => say(LINES.start, true), 900);
+
+    // 15. 竖屏适配
+    function fitCamera() {
+      camera.aspect = innerWidth / innerHeight;
+      camera.fov = (innerWidth / innerHeight < 0.8) ? 70 : 60;
+      camera.updateProjectionMatrix();
+    }
+    fitCamera();
+
+    // 16. 主循环
+    const clock = new THREE.Clock();
+    function loop() {
+      const dt = Math.min(clock.getDelta(), 0.05);
+      if (!over) {
+        elapsed += dt;
+
+        diffTarget = Math.min(DIFF_CAP, diffTarget + PASSIVE_RISE * dt);
+        difficulty += (diffTarget - difficulty) * Math.min(1, dt * CONFIG.diffEase);
+        speed = CONFIG.speedMin + (difficulty / 100) * (PRESET.speedMax - CONFIG.speedMin);
+        const boost = qiaoshanTimer > 0 ? CONFIG.qiaoshanBoost : (chiliTimer > 0 ? 1.4 : 1);
+        const moveSpeed = speed * boost;
+        distance += moveSpeed * dt * CONFIG.distancePerSec;
+
+        player.position.x += (lanes[targetLane] - player.position.x) * Math.min(1, dt * CONFIG.laneLerp);
+
+        const wasAir = playerY > 0.01;
+        vy -= CONFIG.gravity * dt; playerY += vy * dt;
+        if (playerY <= 0) { playerY = 0; vy = 0; if (wasAir) { landSquash = 0.12; spawnDust(); } }
+        player.position.y = playerY;
+        if (jumpBuffer > 0) {
+          jumpBuffer -= dt;
+          if (playerY <= 0.01) { vy = CONFIG.jumpSpeed; jumpBuffer = 0; AudioSys.jump(); }
+        }
+        if (landSquash > 0) {
+          landSquash -= dt;
+          player.scale.y = 1 - Math.max(0, landSquash / 0.12) * 0.15;
+        } else player.scale.y = 1;
+
+        if (slideTimer > 0) { slideTimer -= dt; sliding = true; } else sliding = false;
+        if (invuln > 0) invuln -= dt;
+        if (qiaoshanTimer > 0) { qiaoshanTimer -= dt; invuln = Math.max(invuln, qiaoshanTimer); }
+        if (magnetTimer > 0) magnetTimer -= dt;
+        if (chiliTimer > 0) chiliTimer -= dt;
+        if (comboTimer > 0) { comboTimer -= dt; if (comboTimer <= 0) combo = 0; }
+
+        const runFreq = CONFIG.runBobFreq + speed * CONFIG.runBobPerSpeed;
+        poseCharacter(q, sliding, playerY > 0.05, elapsed, runFreq);
+        poseCharacter(x, false, false, elapsed, runFreq);
+        // 马尾摆动
+        pony.rotation.z = Math.sin(elapsed * runFreq * 0.6) * 0.35;
+        // 换道倾斜
+        if (!sliding && playerY <= 0.05) {
+          q.up.rotation.z = Math.max(-0.3, Math.min(0.3, (lanes[targetLane] - player.position.x) * 0.22));
+        } else q.up.rotation.z = 0;
+
+        aura.visible = qiaoshanTimer > 0;
+        if (aura.visible) aura.scale.setScalar(1 + Math.sin(elapsed * 20) * 0.15);
+        shieldMesh.visible = shielded;
+
+        spawnTimer -= dt;
+        if (spawnTimer <= 0) {
+          spawnWave();
+          spawnTimer = Math.max(CONFIG.spawnIntervalMin, CONFIG.spawnIntervalMax - (difficulty / 100) * CONFIG.spawnIntervalRange);
+        }
+        coinTimer -= dt;
+        if (coinTimer <= 0) {
+          spawnCoinLine(Math.floor(Math.random() * 3));
+          if (Math.random() < 0.4) spawnCoinLine(Math.floor(Math.random() * 3));
+          coinTimer = 1.8 + Math.random() * 0.8;
+        }
+        // 金币雨
+        coinRainTimer -= dt;
+        if (coinRainTimer <= 0) {
+          coinRainTimer = 20 + Math.random() * 10;
+          for (let l = 0; l < 3; l++) spawnCoinLine(l);
+          showToast('金币雨！');
+        }
+        // 道具
+        itemTimer -= dt;
+        if (itemTimer <= 0) {
+          itemTimer = 9 + Math.random() * 5;
+          const types = ['shield', 'magnet', 'chili', 'smoke'];
+          spawnItem(Math.floor(Math.random() * 3), types[Math.floor(Math.random() * 4)]);
+        }
+        // 辛圆抄近路（仅无尽模式）
+        if (gameMode !== 'story') {
+          shortcutTimer -= dt;
+          if (shortcutTimer <= 0) {
+            shortcutTimer = 16 + Math.random() * 8;
+            chase = Math.max(CONFIG.chaseDead + 3, chase - 6);
+            AudioSys.hit(); say(pick(LINES.shortcut), true); showToast('辛圆抄近路啦！');
+          }
+        }
+        // 烟花（第三关）
+        if (gameMode === 'story' && chapter === 3) {
+          fireworkTimer -= dt;
+          if (fireworkTimer <= 0) { spawnFirework(); fireworkTimer = 3 + Math.random() * 3; }
+        }
+
+        // 障碍
+        for (let i = obstacles.length - 1; i >= 0; i--) {
+          const ob = obstacles[i];
+          ob.mesh.position.z += moveSpeed * dt;
+          if (ob.type === 'mover') {
+            ob.mesh.position.x = lanes[ob.lane] + Math.sin(elapsed * 2 + ob.movePhase) * 1.7;
+          }
+          if (!ob.hit && invuln <= 0 && isColliding(ob)) {
+            if (shielded) {
+              shielded = false; ob.hit = true;
+              AudioSys.hit(); showToast('护盾挡下啦！');
+            } else if (chiliTimer > 0 && (ob.type === 'block' || ob.type === 'hurdle')) {
+              scene.remove(ob.mesh); obstacles.splice(i, 1);
+              AudioSys.hit(); showToast('撞碎障碍！');
+              continue;
+            } else {
+              ob.hit = true;
+              chase -= CONFIG.chaseHitPenalty;
+              diffTarget = Math.max(CONFIG.diffFloor, diffTarget - CONFIG.diffHitDrop);
+              combo = 0; comboTimer = 0; combo5Shown = false; combo10Shown = false; noHit = false;
+              invuln = 0.7;
+              AudioSys.hit(); say(pick(LINES.hit));
+              showToast('撞到啦！难度下降');
+              if (chase <= CONFIG.chaseDead) endGame();
+            }
+          }
+          if (!ob.passed && ob.mesh.position.z > 0.8) {
+            ob.passed = true;
+            if (!ob.hit) {
+              const lateral = Math.abs(player.position.x - ob.mesh.position.x);
+              if (lateral < 1.3) {
+                skillMeter = Math.min(100, skillMeter + CONFIG.skillPerDodge);
+                diffTarget = Math.min(DIFF_CAP, diffTarget + CONFIG.diffDodge);
+              } else if (lateral < 3.1) {
+                chase = Math.min(CONFIG.chaseMax, chase + CONFIG.chaseGrazeGain);
+                nearMissCount++;
+                combo = Math.min(combo + 1, CONFIG.comboMax); comboTimer = 4;
+                skillMeter = Math.min(100, skillMeter + CONFIG.skillPerGraze);
+                skillScore += Math.round(CONFIG.grazeScore * multiplier());
+                diffTarget = Math.min(DIFF_CAP, diffTarget + CONFIG.diffGraze);
+                spawnGrazeRing();
+                AudioSys.graze(); say(pick(LINES.near));
+                showToast('擦身！灵巧 +' + CONFIG.skillPerGraze);
+                if (combo === 5 && !combo5Shown) { combo5Shown = true; say(pick(LINES.combo5), true); }
+                if (combo === 10 && !combo10Shown) { combo10Shown = true; say(LINES.combo10, true); showToast('连击大师！'); }
+              }
+            }
+          }
+          if (ob.mesh.position.z > 16) { scene.remove(ob.mesh); obstacles.splice(i, 1); }
+        }
+
+        // 金币
+        for (let i = coins.length - 1; i >= 0; i--) {
+          const c = coins[i];
+          if (qiaoshanTimer > 0 || magnetTimer > 0) {
+            const dx = player.position.x - c.mesh.position.x;
+            const dz = 0 - c.mesh.position.z;
+            if (Math.hypot(dx, dz) < 6) {
+              c.mesh.position.x += dx * dt * 10;
+              c.mesh.position.z += dz * dt * 10;
+            }
+          }
+          c.mesh.position.z += moveSpeed * dt;
+          c.mesh.scale.x = 0.15 + 0.85 * Math.abs(Math.sin(elapsed * 5 + c.phase));
+          if (Math.abs(c.mesh.position.z) < 0.65 && Math.abs(c.mesh.position.x - player.position.x) < 0.7) {
+            coinCount++; coinScore += Math.round(CONFIG.coinValue * multiplier());
+            diffTarget = Math.min(DIFF_CAP, diffTarget + CONFIG.diffCoin);
+            AudioSys.coin();
+            scene.remove(c.mesh); coins.splice(i, 1);
+            continue;
+          }
+          if (c.mesh.position.z > 16) { scene.remove(c.mesh); coins.splice(i, 1); }
+        }
+
+        // 道具拾取
+        for (let i = items.length - 1; i >= 0; i--) {
+          const it = items[i];
+          it.mesh.position.z += moveSpeed * dt;
+          it.mesh.position.y = 0.7 + Math.sin(elapsed * 4 + i) * 0.15;
+          if (Math.abs(it.mesh.position.z) < 0.7 && Math.abs(it.mesh.position.x - player.position.x) < 0.75) {
+            applyItem(it.type);
+            scene.remove(it.mesh); items.splice(i, 1);
+            continue;
+          }
+          if (it.mesh.position.z > 16) { scene.remove(it.mesh); items.splice(i, 1); }
+        }
+
+        // 街景
+        for (const p of sideProps) {
+          p.g.position.z += moveSpeed * dt;
+          if (p.g.position.z > 16) {
+            p.g.position.z = -100 + Math.random() * 20;
+            p.g.position.x = p.side * (4.5 + Math.random() * 3);
+          }
+        }
+        for (const g of overheadProps) {
+          g.position.z += moveSpeed * dt;
+          if (g.position.z > 16) g.position.z -= 90;
+        }
+
+        // 辛圆距离
+        chase += CONFIG.chaseRegen * dt;
+        if (chase > CONFIG.chaseMax) chase = CONFIG.chaseMax;
+        const t = Math.max(0, Math.min(1, (chase - CONFIG.chaseDead) / (CONFIG.chaseMax - CONFIG.chaseDead)));
+        chaser.position.z = 4 + t * 4;
+        chaser.position.x = player.position.x * 0.3;
+
+        chaseSayTimer -= dt;
+        if (chaseSayTimer <= 0 && chase < 9) { say(pick(LINES.chaseClose)); chaseSayTimer = 4; }
+
+        if (gameMode === 'story') {
+          while (storyStep < CH.script.length && distance >= CH.script[storyStep].d) {
+            say(CH.script[storyStep].text, true);
+            storyStep++;
+          }
+          if (distance >= CH.target) endStory();
+        }
+
+        updateUI();
+      } else if (cutscene) {
+        elapsed += dt;
+        const runFreq = CONFIG.runBobFreq + speed * CONFIG.runBobPerSpeed;
+        cutscene.t += dt;
+        const dur = 1.1;
+        const k = Math.min(1, cutscene.t / dur);
+        const e = k * k * (3 - 2 * k);
+        chaser.position.x = cutscene.from.x + (cutscene.to.x - cutscene.from.x) * e;
+        chaser.position.z = cutscene.from.z + (cutscene.to.z - cutscene.from.z) * e;
+        poseCharacter(x, false, false, elapsed, runFreq);
+        q.up.position.y = 0.45; q.up.rotation.x = 0; q.up.rotation.z = 0; q.headG.position.y = 0.85;
+        q.legL.rotation.x = 0; q.legR.rotation.x = 0;
+        q.armL.rotation.x = 0; q.armR.rotation.x = 0;
+        pony.rotation.z = 0;
+        // 第三关结局放烟花
+        if (pendingChapter === 3) {
+          cutscene.fw -= dt;
+          if (cutscene.fw <= 0) { spawnFirework(); cutscene.fw = 0.4; }
+        }
+        const dial = chapters[pendingChapter].endDialogue;
+        const lineTime = dur + cutscene.lineIdx * 1.5;
+        if (cutscene.lineIdx < dial.length && cutscene.t >= lineTime) {
+          const d = dial[cutscene.lineIdx];
+          say(d.who + '：' + d.text, true);
+          cutscene.lineIdx++;
+        }
+        if (cutscene.t >= dur + dial.length * 1.5 + 0.5) {
+          cutscene = null;
+          showStoryPanel(pendingChapter);
+        }
+      }
+
+      // 粒子 / 雪花（每帧都更新）
+      updateParticles(dt);
+      updateSnow(dt);
+
+      renderer.render(scene, camera);
+      requestAnimationFrame(loop);
+    }
+    loop();
+
+    // 17. 自适应
+    addEventListener('resize', () => {
+      fitCamera();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+  }
+
+  if (window.THREE) init();
+  else {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js';
+    s.onload = init;
+    document.head.appendChild(s);
+  }
+  </script>
+</body>
+</html>
